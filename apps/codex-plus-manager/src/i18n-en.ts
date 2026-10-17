@@ -5,6 +5,16 @@
 
 // Plain strings: t("中文") -> EN_PLAIN["中文"].
 export const EN_PLAIN: Record<string, string> = {
+  "启动与设置": "Launch and settings",
+  "常用增强、语音输入与下一步建议": "General enhancements, dictation and next-step suggestions",
+  "启动仍在进行，请稍后刷新状态。": "Startup is still in progress. Refresh the status shortly.",
+  "正在启动…": "Starting…",
+  "正在加载增强设置…": "Loading enhancement settings…",
+  "留空自动检测": "Leave empty to detect automatically",
+  "选择应用": "Choose app",
+  "额外启动参数（每行一个）": "Extra launch arguments (one per line)",
+  "自动接管 Codex 并加载增强": "Automatically attach to Codex and load enhancements",
+  "增强配置保存在本机，启动时沿用 Codex 当前登录与模型配置。": "Enhancement settings are stored locally. Codex keeps its current login and model configuration.",
   "设为当前 Key": "Select this key",
   "Key 名称": "Key name",
   "删除 Key": "Delete key",

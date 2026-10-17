@@ -2481,6 +2481,7 @@ fn sync_active_relay_to_home(
 }
 
 fn normalize_launch_request(mut request: LaunchRequest) -> LaunchRequest {
+    request.sync_active_relay = false;
     // launcher 收到显式 --app-path 时不会回退自动探测（避免静默启动错误目录），
     // 所以这里先把明显无效的路径摘掉，让它走探测而不是永久失败（#1972）。
     let requested_app_path = request.app_path.trim().to_string();
@@ -3173,8 +3174,7 @@ pub fn load_settings() -> CommandResult<SettingsPayload> {
         );
     };
     let store = SettingsStore::default();
-    let home = codex_plus_core::relay_config::default_codex_home_dir();
-    match codex_plus_core::provider_import::initialize_local_config_provider(&store, &home) {
+    match store.load_for_enhancements() {
         Ok(settings) => ok(
             "设置已加载。",
             SettingsPayload {
@@ -3194,78 +3194,24 @@ pub fn load_settings() -> CommandResult<SettingsPayload> {
 
 #[tauri::command]
 pub fn save_settings(settings: BackendSettings) -> CommandResult<SettingsPayload> {
-    let settings = normalize_settings_before_save(settings);
-    // 保存诊断：供应商模型列表被改小/改大时能直接看出「提交上来的到底是什么」。
-    // 用户反馈过「删掉一行保存后又变回三行」，只有把每次保存的行数记下来才能区分
-    // 「界面没提交改动」和「提交了又被别处覆盖」。
-    log_manager_event(
-        "manager.save_settings",
-        json!({
-            "activeRelayId": settings.active_relay_id,
-            "relayProfiles": settings.relay_profiles.iter().map(|profile| json!({
-                "id": profile.id,
-                "modelCount": profile.model_list.lines().filter(|line| !line.trim().is_empty()).count(),
-                "models": profile.model_list.lines().filter(|line| !line.trim().is_empty()).collect::<Vec<_>>(),
-            })).collect::<Vec<_>>(),
-        }),
-    );
     let Ok(_guard) = relay_switch_mutex().lock() else {
-        return failed(
-            "供应商切换锁已损坏，请重启管理器后再试。",
-            SettingsPayload {
-                settings,
-                settings_path: codex_plus_core::paths::default_settings_path()
-                    .to_string_lossy()
-                    .to_string(),
-                user_scripts: user_script_inventory(),
-            },
-        );
+        return failed("设置锁不可用，请重启管理器后再试。", fallback_settings_payload());
     };
     let store = SettingsStore::default();
-    let previous = store.load().unwrap_or_default();
-    let dream_skin_enabled = settings.enhancements_enabled && settings.codex_app_dream_skin_enabled;
-    if let Err(error) = codex_plus_core::dream_skin::sync_default_dream_skin_base_theme(
-        dream_skin_enabled,
-        &settings.codex_app_dream_skin_theme_config,
-    ) {
-        return failed(
-            &format!("保存皮肤基础主题失败：{error}"),
-            SettingsPayload {
-                settings,
-                settings_path: codex_plus_core::paths::default_settings_path()
-                    .to_string_lossy()
-                    .to_string(),
-                user_scripts: user_script_inventory(),
-            },
-        );
-    }
+    let previous = match store.load() {
+        Ok(settings) => settings,
+        Err(error) => return failed(&format!("读取设置失败，未覆盖配置：{error}"), fallback_settings_payload()),
+    };
+    let settings = match codex_plus_core::enhancements_only::merge_settings(previous, settings) {
+        Ok(settings) => settings,
+        Err(error) => return failed(&format!("保存增强设置失败：{error}"), fallback_settings_payload()),
+    };
     match store.save(&settings) {
         Ok(()) => {
-            if let Ok(runtime) = weixin_runtime().lock()
-                && let Some(runtime) = runtime.as_ref()
-            {
-                runtime.codex_path.set(&settings.weixin_connect_codex_path);
-            }
-            // 自动接管是常驻行为，保存后立刻生效，不必重启管理器。
             crate::auto_takeover::apply_enabled(settings.codex_app_auto_takeover);
             settings_payload("设置已保存。", "设置保存后重新读取失败")
         }
-        Err(error) => {
-            let _ = codex_plus_core::dream_skin::sync_default_dream_skin_base_theme(
-                previous.enhancements_enabled && previous.codex_app_dream_skin_enabled,
-                &previous.codex_app_dream_skin_theme_config,
-            );
-            failed(
-                &format!("保存设置失败：{error}"),
-                SettingsPayload {
-                    settings,
-                    settings_path: codex_plus_core::paths::default_settings_path()
-                        .to_string_lossy()
-                        .to_string(),
-                    user_scripts: user_script_inventory(),
-                },
-            )
-        }
+        Err(error) => failed(&format!("保存设置失败：{error}"), fallback_settings_payload()),
     }
 }
 
@@ -7506,7 +7452,7 @@ fn settings_payload_value() -> Result<SettingsPayload, (anyhow::Error, SettingsP
     let settings_path = codex_plus_core::paths::default_settings_path()
         .to_string_lossy()
         .to_string();
-    match store.load() {
+    match store.load_for_enhancements() {
         Ok(settings) => Ok(SettingsPayload {
             settings,
             settings_path,
@@ -7534,15 +7480,7 @@ fn fallback_settings_payload() -> SettingsPayload {
 }
 
 fn user_script_inventory() -> Value {
-    default_user_script_manager()
-        .inventory()
-        .unwrap_or_else(|error| {
-            json!({
-                "enabled": true,
-                "scripts": [],
-                "error": error.to_string()
-            })
-        })
+    json!({"enabled": false, "scripts": []})
 }
 
 fn failed_script_market_payload(message: &str) -> ScriptMarketPayload {

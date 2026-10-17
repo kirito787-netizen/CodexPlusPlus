@@ -520,6 +520,9 @@
   }
 
   async function loadUserScripts(path = "/user-scripts/list", payload = {}) {
+    codexPlusUserScripts = { enabled: false, scripts: [] };
+    codexPlusUserScriptsLoaded = true;
+    return;
     const requestPayload = path === "/user-scripts/list"
       ? { ...payload, runtime_status: window.__codexPlusUserScripts?.scripts || {} }
       : payload;
@@ -743,6 +746,8 @@
   }
 
   async function fetchCodexPlusAds() {
+    codexPlusAdsLoaded = true;
+    return;
     try {
       const localPayload = await postJson(codexPlusAdsUrl, {});
       codexPlusAds = normalizeCodexPlusAds(localPayload?.ads ? localPayload : localPayload?.payload);
@@ -1096,8 +1101,6 @@
    * 这里把旧名 userScripts 也映射过去，避免存量调用点失效。
    */
   function codexPlusModalTab(tab) {
-    if (tab === "extensions" || tab === "userScripts") return codexPlusExtensionsTab;
-    if (tab === "sponsor") return "sponsor";
     return "home";
   }
 
@@ -1328,10 +1331,6 @@
               <h2 class="codex-plus-settings-section-title">工具与关于</h2>
               <div class="codex-plus-settings-card">
                 <div class="codex-plus-row">
-                  <div><div class="codex-plus-row-title">历史会话修复</div><div class="codex-plus-row-description">切换官方登录、混合 API 或纯 API 后，让旧对话重新显示在当前模式下。</div></div>
-                  <button type="button" class="codex-plus-toggle" data-codex-backend-setting="providerSyncEnabled"><span></span></button>
-                </div>
-                <div class="codex-plus-row">
                   <div><div class="codex-plus-row-title">管理工具</div><div class="codex-plus-row-description">配置增强功能、模型和语音服务。</div></div>
                   <button type="button" class="codex-plus-action-button" data-codex-open-manager="true">打开管理工具</button>
                 </div>
@@ -1358,27 +1357,7 @@
             </section>
             ${renderCodexPlusExtensionMenuRows()}
           </div>
-          <div class="codex-plus-panel" data-codex-plus-panel="${codexPlusExtensionsTab}" hidden>
-            <div class="codex-plus-discovery codex-plus-extensions-page">
-              <div class="codex-plus-discovery-header">
-                <div><h1 class="codex-plus-discovery-title">拓展</h1><p class="codex-plus-discovery-description">为 Codex 添加更多增强功能。</p></div>
-                <div class="codex-plus-discovery-toolbar">
-                  <label class="codex-plus-discovery-search">${codexPlusDiscoveryIcons.search}<input type="search" data-codex-extensions-search="true" aria-label="搜索拓展" placeholder="搜索拓展" value="${escapeHtml(codexPlusExtensionsQuery)}" spellcheck="false" /></label>
-                  <button type="button" class="codex-plus-discovery-icon-button" data-codex-market-refresh="true" title="刷新拓展" aria-label="刷新拓展">${codexPlusDiscoveryIcons.refresh}</button>
-                </div>
-              </div>
-              <div class="codex-plus-extensions-detail" data-codex-plus-extensions-detail="true">${renderCodexPlusExtensionsDetail()}</div>
-            </div>
-          </div>
-          <div class="codex-plus-panel" data-codex-plus-panel="sponsor" hidden>
-            <div class="codex-plus-discovery codex-plus-sponsor-page">
-              <div class="codex-plus-discovery-header">
-                <div><h1 class="codex-plus-discovery-title">推荐内容</h1><p class="codex-plus-discovery-description codex-plus-sponsor-text">以下推荐来自支持 Codex++ 继续维护的合作方。</p></div>
-              </div>
-              <h2 class="codex-plus-discovery-section-title">合作伙伴</h2>
-              <div class="codex-plus-ad-remote">${renderCodexPlusAds()}</div>
-            </div>
-          </div>
+
         </div>
       </div>
       <div id="codex-plus-typing-effect-menu" class="codex-plus-dropdown-menu" data-codex-plus-typing-effect-menu="true" role="listbox" aria-label="打字特效（彩虹 P）" hidden>
@@ -1857,8 +1836,6 @@
 
     const specs = [
       { id: codexPlusRailNavId, label: "Codex++", iconMarkup: icons.home, withStatus: true, onActivate: openCodexPlusPage },
-      { id: codexPlusRailExtensionsId, label: "拓展", iconMarkup: icons.extensions, withStatus: false, onActivate: openCodexPlusExtensions },
-      { id: codexPlusRailSponsorId, label: "推荐内容", iconMarkup: icons.sponsor, withStatus: false, onActivate: openCodexPlusSponsor },
     ];
 
     const anchor = codexPlusRailPrimaryAnchor(rail);

@@ -314,20 +314,6 @@ describe("renderer injection header compatibility", () => {
     assert.match(renderer, /const installed = document\.getElementById\(codexPlusSidebarNavId\)\s*\|\| document\.getElementById\(codexPlusRailNavId\);/);
   });
 
-  it("opens 拓展 as a standalone page instead of a Codex++ tab", async () => {
-    const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
-
-    assert.match(renderer, /codexPlusExtensionsTab\s*=\s*"extensions"/);
-    assert.match(renderer, /function openCodexPlusExtensions\(\)/);
-    assert.match(renderer, /openCodexPlusModal\(\{ page: true, tab: codexPlusExtensionsTab \}\)/);
-    // 旧名 userScripts 仍要能映射过去，避免存量调用点失效。
-    assert.match(renderer, /if \(tab === "extensions" \|\| tab === "userScripts"\) return codexPlusExtensionsTab;/);
-    // 弹窗必须尊重传入的初始 tab，而不是硬编码 home。
-    assert.match(renderer, /selectCodexPlusTab\(initialTab\);/);
-    // 激活态要靠 data-codex-plus-active-tab 区分页面，必须排在 selectCodexPlusTab 之后。
-    assert.match(renderer, /selectCodexPlusTab\(initialTab\);\s*\/\/[^]*?if \(pageMode\) setCodexPlusSidebarNavActive\(true, codexPlusActiveEntry\(\) \|\| "home"\);/);
-  });
-
   it("gives the page mode a two-column layout with its own left panel", async () => {
     const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
 
@@ -349,36 +335,6 @@ describe("renderer injection header compatibility", () => {
     // 左面板分组导航走同一个选中函数。
     assert.match(renderer, /const pageNav = target\?\.closest\("\[data-codex-plus-page-nav\]"\)/);
     assert.match(renderer, /selectCodexPlusTab\(pageNav\.getAttribute\("data-codex-plus-page-nav"\)\)/);
-  });
-
-  it("把三个 rail 入口都接成独立页面，并跟随 Codex 的界面缩放", async () => {
-    const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
-
-    // 推荐内容从弹窗二级 tab 提成图标栏上的一级入口。
-    assert.match(renderer, /const codexPlusRailSponsorId = "codex-plus-rail-sponsor"/);
-    assert.match(renderer, /const codexPlusSponsorTab = "sponsor"/);
-    assert.match(renderer, /function openCodexPlusSponsor\(\)/);
-    assert.match(renderer, /id: codexPlusRailSponsorId, label: "推荐内容"/);
-    // 三个入口都要参与选中态映射，否则「推荐内容」亮不起来。
-    assert.match(renderer, /\[codexPlusRailSponsorId, "sponsor"\],/);
-    assert.match(renderer, /if \(tab === codexPlusSponsorTab\) return "sponsor";/);
-
-    // 弹窗里的 tab 条已随入口外移删除，不该再有残留。
-    assert.doesNotMatch(renderer, /codex-plus-tab-button/);
-
-    // 「拓展」入口用 VSCode 的扩展字形，和列表默认图标同一份 path。
-    assert.match(renderer, /extensions: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="\$\{codexPlusDefaultExtensionIconPath\}"/);
-
-    // 界面缩放：读 Codex 的 zoom 变量，套到 overlay 上，尺寸用 calc 反向抵消。
-    assert.match(renderer, /const codexPlusWindowZoomVar = "--codex-window-zoom"/);
-    assert.match(renderer, /function codexPlusWindowZoom\(\)/);
-    assert.match(renderer, /function applyCodexPlusZoom\(overlay\)/);
-    assert.match(renderer, /overlay\.style\.setProperty\("zoom", String\(zoom\)\)/);
-    assert.match(renderer, /width: calc\(100vw \/ var\(--codex-plus-zoom, 1\)\)/);
-    // 页面模式的 left 偏移要按 zoom 折算回布局坐标，CSS 里的 width 用的是同一个空间，
-    // 两边量纲不一致会把右边缘算短（曾出现 62 + 1652 = 1714，视口 1727）。
-    assert.match(renderer, /const layoutLeft = zoom === 1 \? left : left \/ zoom;/);
-    assert.match(renderer, /overlay\.style\.setProperty\("--codex-plus-page-left", `\$\{layoutLeft\}px`\)/);
   });
 
   it("颜色走 Codex 的语义令牌，不写死调色板", async () => {
@@ -414,42 +370,6 @@ describe("renderer injection header compatibility", () => {
     assert.match(renderer, /codexPlusDefaultExtensionIconPath/);
     // 脚本启停/状态变化要同步到左面板与详情。
     assert.match(renderer, /if \(codexPlusActiveEntry\(\) === "extensions"\) refreshCodexPlusExtensionsView\(\);/);
-  });
-
-  it("shows a native-style detail pane for the selected 拓展", async () => {
-    const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
-
-    assert.match(renderer, /function renderCodexPlusExtensionsDetail\(\)/);
-    assert.match(renderer, /data-codex-plus-extensions-detail="true"/);
-    assert.match(renderer, /function codexPlusExtensionsSelectionDetail\(\)/);
-    // 详情里给已安装的开关（复用 user-script-key 委托）与卸载入口。
-    assert.match(renderer, /data-codex-extensions-uninstall=/);
-    assert.match(renderer, /function uninstallUserScript\(key\)/);
-    assert.match(renderer, /postJson\("\/user-scripts\/delete", \{ key \}\)/);
-    // 内置脚本在只读目录里，只给用户脚本提供卸载。
-    assert.match(renderer, /if \(local\?\.source === "user"\)/);
-    // 市场条目在详情里也能直接安装。
-    assert.match(renderer, /codex-plus-extensions-detail-primary/);
-    // 选中项要高亮。
-    assert.match(renderer, /data-active="\$\{String\(selected\)\}"/);
-  });
-
-  it("gives 拓展 searchable 已安装 / 市场 views while retaining the search input", async () => {
-    const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
-
-    assert.match(renderer, /data-codex-extensions-search="true"/);
-    assert.match(renderer, /function refreshCodexPlusExtensionsView\(\)/);
-    assert.match(renderer, /function codexPlusExtensionsEntries\(\)/);
-    assert.match(renderer, /function loadScriptMarket\(/);
-    // 市场走 bridge 的两个新路由。
-    assert.match(renderer, /postJson\("\/script-market\/list", \{\}\)/);
-    assert.match(renderer, /postJson\("\/script-market\/install", \{ id \}\)/);
-    assert.match(renderer, /data-codex-extensions-browse="installed"/);
-    const start = renderer.indexOf("  function refreshCodexPlusExtensionsView()");
-    const end = renderer.indexOf("  function codexPlusExtensionsSelectionDetail()", start);
-    assert.ok(start >= 0 && end > start);
-    // 搜索框留在主区标题栏，刷新只更新侧栏和结果，不重建输入框或抢焦点。
-    assert.doesNotMatch(renderer.slice(start, end), /data-codex-extensions-search|setSelectionRange/);
   });
 
   it("does not install Codex++ UI in embedded browser documents", async () => {
@@ -1470,7 +1390,7 @@ it("opens Stepwise configuration in the manager enhancement page", async () => {
 
 describe("Stepwise generation mode contracts", () => {
   it("exposes automatic and manual generation in manager enhancements", async () => {
-    const app = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+    const app = await readFile(new URL("./EnhancementUI.tsx", import.meta.url), "utf8");
     const renderer = await readFile(
       new URL("../../../assets/inject/renderer-inject.js", import.meta.url),
       "utf8",

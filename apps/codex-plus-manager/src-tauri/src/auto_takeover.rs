@@ -137,7 +137,7 @@ fn log_event(event: &str, detail: serde_json::Value) {
 /// 当前配置是否开启自动接管。
 pub fn is_enabled() -> bool {
     SettingsStore::default()
-        .load()
+        .load_for_enhancements()
         .map(|settings| settings.codex_app_auto_takeover)
         .unwrap_or(false)
 }
@@ -269,7 +269,7 @@ pub fn payload() -> AutoTakeoverPayload {
 
 fn active_policy() -> ActivePolicy {
     SettingsStore::default()
-        .load()
+        .load_for_enhancements()
         .map(|settings| ActivePolicy::parse(&settings.codex_app_auto_takeover_when_active))
         .unwrap_or(ActivePolicy::Defer)
 }
@@ -514,7 +514,7 @@ fn current_instance() -> Option<InstanceKey> {
 }
 
 fn resolve_app_dir(latest: Option<&codex_plus_core::status::LaunchStatus>) -> Option<PathBuf> {
-    let settings = SettingsStore::default().load().unwrap_or_default();
+    let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
     codex_plus_core::app_paths::resolve_codex_app_dir_with_saved(
         latest
             .and_then(|status| status.codex_app.as_deref())

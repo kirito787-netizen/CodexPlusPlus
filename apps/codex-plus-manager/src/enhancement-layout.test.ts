@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-const app = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+const app = readFileSync(new URL("./EnhancementUI.tsx", import.meta.url), "utf8");
 
 /// 取顶格书写的选择器规则体，空白按 \s+ 容忍，避免误匹配组合选择器。
 function ruleBody(selector: string) {

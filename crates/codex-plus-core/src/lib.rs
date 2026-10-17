@@ -23,6 +23,7 @@ pub mod dream_skin_market;
 pub mod dream_skin_package;
 pub mod dream_skin_runtime;
 pub mod env_conflicts;
+pub mod enhancements_only;
 pub mod grok_config;
 pub mod http_client;
 pub mod install;

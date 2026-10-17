@@ -701,37 +701,6 @@ where
                 serde_json::json!({"reason": "desktop_writer_active"}),
             );
         }
-        timeline.mark("dream_skin_theme", 30);
-        crate::dream_skin::sync_default_dream_skin_base_theme(
-            settings.enhancements_enabled
-                && settings.codex_app_dream_skin_enabled
-                && !settings.codex_app_dream_skin_paused,
-            &settings.codex_app_dream_skin_theme_config,
-        )?;
-        // 这一步在 #2244 的采样里是嫌疑最大的同步全表扫描，单独标记起止，
-        // 从 latest-status 就能看出冷启动时间是否耗在这里。
-        timeline.mark("sanitize_historical_model_suffixes", 40);
-        match crate::codex_sqlite::sanitize_historical_model_suffixes(&home) {
-            Ok(result) if result.updated > 0 => {
-                let _ = crate::diagnostic_log::append_diagnostic_log(
-                    "launcher.sanitize_historical_model_suffixes",
-                    serde_json::json!({
-                        "scanned": result.scanned,
-                        "updated": result.updated
-                    }),
-                );
-            }
-            Ok(_) => {}
-            Err(error) => {
-                let _ = crate::diagnostic_log::append_diagnostic_log(
-                    "launcher.sanitize_historical_model_suffixes_failed",
-                    serde_json::json!({
-                        "error": error.to_string()
-                    }),
-                );
-            }
-        }
-        timeline.mark("sanitize_historical_model_suffixes_done", 50);
         let protocol_proxy_enabled = relay_protocol_proxy_enabled(&settings)
             || remote_control_provider_proxy_enabled(&settings);
         // issue #2264：重启链路上的模型漂移修复。launcher 不重放完整 apply（那会
@@ -904,10 +873,13 @@ fn should_start_isolated_quota_gate(settings: &BackendSettings) -> bool {
 }
 
 fn relay_protocol_proxy_enabled(settings: &BackendSettings) -> bool {
-    settings.active_relay_uses_protocol_proxy()
+    settings.relay_profiles_enabled && settings.active_relay_uses_protocol_proxy()
 }
 
 fn remote_control_provider_proxy_enabled(settings: &BackendSettings) -> bool {
+    if !settings.relay_profiles_enabled {
+        return false;
+    }
     let profile = settings.active_relay_profile();
     profile.relay_mode == crate::settings::RelayMode::Official && profile.official_mix_api_key
 }
@@ -1031,7 +1003,7 @@ impl LaunchHooks for DefaultLaunchHooks {
     }
 
     async fn load_settings(&self) -> anyhow::Result<BackendSettings> {
-        SettingsStore::default().load()
+        SettingsStore::default().load_for_enhancements()
     }
 
     fn cleanup_unsupported_config(&self) -> anyhow::Result<()> {
@@ -1848,7 +1820,7 @@ async fn handle_helper_connection(
                 "message": "后端已连接",
                 "version": crate::version::VERSION,
                 "hideOfficialUsageAlert": crate::assets::hide_official_usage_alert_config(
-                    &crate::settings::SettingsStore::default().load().unwrap_or_default()
+                    &crate::settings::SettingsStore::default().load_for_enhancements().unwrap_or_default()
                 ),
                 "transport": "http-helper"
             }))?,
@@ -1978,7 +1950,7 @@ fn overlay_image_response() -> (String, Vec<u8>, String, &'static str) {
             "helper.overlay_image_not_found",
         )
     };
-    let settings = SettingsStore::default().load().unwrap_or_default();
+    let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
     if !settings.codex_app_image_overlay_enabled {
         return not_found();
     }
@@ -2013,7 +1985,7 @@ fn dream_skin_image_response() -> (String, Vec<u8>, String, &'static str) {
             "helper.dream_skin_image_not_found",
         )
     };
-    let settings = SettingsStore::default().load().unwrap_or_default();
+    let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
     if !settings.codex_app_dream_skin_enabled {
         return not_found();
     }
@@ -2462,7 +2434,7 @@ async fn handle_dictation_connection(
     let (status, response) = if method == "OPTIONS" {
         ("204 No Content".to_string(), Vec::new())
     } else if path == "/dictation/status" && method == "GET" {
-        let settings = SettingsStore::default().load().unwrap_or_default();
+        let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
         (
             "200 OK".to_string(),
             serde_json::to_vec(&crate::dictation::public_status(
@@ -2477,7 +2449,7 @@ async fn handle_dictation_connection(
                 message: "语音请求未授权，请从 Codex++ 重新发起".to_string(),
             })
         } else {
-            let settings = SettingsStore::default().load().unwrap_or_default();
+            let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
             let effective = crate::dictation::effective_settings(&settings);
             match transcribe_until_disconnect(stream, &effective, body, content_type).await {
                 Some(result) => result,
@@ -4056,7 +4028,7 @@ async fn try_inject(debug_port: u16, helper_port: u16) -> anyhow::Result<()> {
         .web_socket_debugger_url
         .as_deref()
         .ok_or_else(|| anyhow::anyhow!("selected CDP target has no websocket URL"))?;
-    let settings = SettingsStore::default().load().unwrap_or_default();
+    let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
     let script = crate::assets::injection_script_with_settings(helper_port, &settings);
     let ctx = crate::routes::BridgeContext::core(Arc::new(crate::routes::CoreRuntimeService::new(
         debug_port,
@@ -4109,7 +4081,7 @@ async fn pet_overlay_supports_v2_cursor(websocket_url: &str) -> anyhow::Result<b
 }
 
 async fn sync_pet_real_mouse_overlay(debug_port: u16, _helper_port: u16) -> anyhow::Result<()> {
-    let settings = SettingsStore::default().load().unwrap_or_default();
+    let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
     let enabled = settings.enhancements_enabled && settings.codex_app_pet_real_mouse_look;
     let targets = crate::cdp::list_targets(debug_port).await?;
     for target in targets
@@ -4149,7 +4121,7 @@ async fn sync_pet_real_mouse_overlay(debug_port: u16, _helper_port: u16) -> anyh
 #[cfg(windows)]
 async fn run_pet_real_mouse_cursor_driver(debug_port: u16) {
     loop {
-        let settings = SettingsStore::default().load().unwrap_or_default();
+        let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
         if !settings.enhancements_enabled || !settings.codex_app_pet_real_mouse_look {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             continue;
@@ -4201,7 +4173,7 @@ async fn run_pet_real_mouse_target_driver(debug_port: u16, target: crate::cdp::C
         std::time::Duration::from_millis(100),
         || {
             if ticks_until_settings_check == 0 {
-                let settings = SettingsStore::default().load().unwrap_or_default();
+                let settings = SettingsStore::default().load_for_enhancements().unwrap_or_default();
                 if !settings.enhancements_enabled || !settings.codex_app_pet_real_mouse_look {
                     return Ok(None);
                 }

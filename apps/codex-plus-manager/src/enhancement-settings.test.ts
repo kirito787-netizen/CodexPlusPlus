@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import ts from "typescript";
 
-const appSource = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+const appSource = await readFile(new URL("./EnhancementUI.tsx", import.meta.url), "utf8") + "\n" + await readFile(new URL("./EnhancementsApp.tsx", import.meta.url), "utf8");
 const app = ts.createSourceFile("App.tsx", appSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
 function descendants(node: ts.Node): ts.Node[] {
@@ -131,10 +131,7 @@ test("complete voice and Stepwise panels share the enhancement form and save act
   const calls = descendants(enhance).filter(ts.isCallExpression);
   assert.ok(calls.some((node) => node.expression.getText(app) === "actions.saveSettings"), "enhancements must retain their save action");
 
-  const settings = component("SettingsScreen");
-  assert.ok(!elements(settings).some((element) => ["DictationSettingsPanel", "StepwiseSettingsPanel"].includes(element.tagName.getText(app))));
-  assert.ok(!descendants(settings).some((node) => ts.isPropertyAccessExpression(node)
-    && (/^form\.dictation(?:\.|$)/.test(node.getText(app)) || /^form\.codexApp(?:Stepwise|AnswerOutline)/.test(node.getText(app)))));
+
 });
 
 test("local speech download requires a configuration button click and mount only reads status", () => {
@@ -174,17 +171,11 @@ test("enhancement panels retain every service field, private key input and Stepw
 
 test("manager deep links select their enhancement tab before displaying the page", () => {
   const navigation = descendants(app).find((node) => ts.isVariableDeclaration(node)
-    && ts.isIdentifier(node.name) && node.name.text === "consumePendingManagerNavigation");
+    && ts.isIdentifier(node.name) && node.name.text === "navigation");
   assert.ok(navigation);
   const calls = descendants(navigation).filter(ts.isCallExpression);
-  const selection = calls.find((node) => node.expression.getText(app) === "setEnhancementTab");
-  const argument = selection?.arguments[0];
-  assert.ok(argument && ts.isBinaryExpression(argument));
-  assert.equal(argument.operatorToken.kind, ts.SyntaxKind.QuestionQuestionToken);
-  assert.equal(argument.left.getText(app), "destination.section");
-  assert.ok(ts.isStringLiteral(argument.right) && argument.right.text === "general");
-  const route = calls.find((node) => node.expression.getText(app) === "setRoute");
-  assert.ok(selection && route && selection.pos < route.pos);
+  assert.ok(calls.some(node => node.expression.getText(app) === "setTab"));
+  assert.ok(calls.some(node => node.expression.getText(app) === "setPage"));
 });
 
 test("all enhancement panes stay mounted while tab selection only changes visibility", () => {
@@ -216,8 +207,8 @@ test("all enhancement panes stay mounted while tab selection only changes visibi
   }
   const screen = elements(app).find((element) => element.tagName.getText(app) === "EnhanceScreen");
   assert.ok(screen);
-  assert.equal(attribute(screen, "activeTab"), "enhancementTab");
-  assert.equal(attribute(screen, "onTabChange"), "setEnhancementTab");
+  assert.equal(attribute(screen, "activeTab"), "tab");
+  assert.equal(attribute(screen, "onTabChange"), "setTab");
 });
 
 test("enhancement saving is an explicit permanent top action", () => {

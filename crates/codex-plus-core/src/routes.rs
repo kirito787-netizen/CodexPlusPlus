@@ -203,6 +203,9 @@ pub async fn handle_bridge_request(
                 .unwrap_or_default()
         }),
     );
+    if !crate::enhancements_only::bridge_route_enabled(path) {
+        return json!({"status": "unavailable", "message": "此版本仅提供 Codex 增强功能"});
+    }
     let result = match path {
         "/settings/get" => settings_value(&ctx, ctx.settings.get_settings().await).await,
         "/dictation/status" => ctx.settings.get_settings().await.map(|settings| {
@@ -439,11 +442,15 @@ impl CoreSettingsService {
 #[async_trait]
 impl BridgeSettingsService for CoreSettingsService {
     async fn get_settings(&self) -> anyhow::Result<BackendSettings> {
-        self.store.load()
+        self.store.load_for_enhancements()
     }
 
     async fn set_settings(&self, payload: Value) -> anyhow::Result<BackendSettings> {
-        self.store.update(payload)
+        let mut payload = payload;
+        if let Some(patch) = payload.as_object_mut() {
+            patch.retain(|key, _| crate::enhancements_only::setting_enabled(key));
+        }
+        self.store.update(payload).map(crate::enhancements_only::runtime_settings)
     }
 
     async fn codex_app_version(&self) -> anyhow::Result<String> {
@@ -757,6 +764,7 @@ fn settings_payload_value(
     }
     remove_named_keys(&mut value);
     if let Some(object) = value.as_object_mut() {
+        object.insert("enhancementsOnly".to_string(), Value::Bool(true));
         object.remove("codexAppStepwiseApiKey");
         if let Some(dictation) = object.get_mut("dictation").and_then(Value::as_object_mut) {
             let configured = dictation

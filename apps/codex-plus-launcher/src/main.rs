@@ -781,7 +781,7 @@ async fn repair_session_index_automatically(check_setting: bool) {
     let result = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
         if check_setting
             && !codex_plus_core::settings::SettingsStore::default()
-                .load()?
+                .load_for_enhancements()?
                 .provider_sync_enabled
         {
             return Ok(());
@@ -1088,7 +1088,7 @@ impl LaunchHooks for LauncherHooks {
     }
 
     fn has_pending_remote_control_session_recoveries(&self) -> bool {
-        codex_plus_core::paths::default_pending_remote_control_recovery_path().exists()
+        false
     }
 
     fn remote_control_session_recovery_is_safe_to_run(&self) -> bool {
@@ -1099,7 +1099,7 @@ impl LaunchHooks for LauncherHooks {
         let outcomes = tokio::task::spawn_blocking(|| {
             let requests = codex_plus_core::remote_control_recovery::load_pending_remote_control_recoveries(None)?;
             let settings = codex_plus_core::settings::SettingsStore::default()
-                .load()?;
+                .load_for_enhancements()?;
             let mut outcomes = Vec::with_capacity(requests.len());
             for request in requests {
                 let current_profile = settings
@@ -1457,7 +1457,7 @@ impl BridgeDataService for LauncherDataService {
 
     async fn recover_remote_control_session(&self, thread_id: String) -> anyhow::Result<Value> {
         let settings = codex_plus_core::settings::SettingsStore::default()
-            .load()
+            .load_for_enhancements()
             .unwrap_or_default();
         let profile = settings.active_relay_profile();
         if !settings.relay_profiles_enabled
@@ -1732,13 +1732,10 @@ async fn try_inject_with_context(
         .ok_or_else(|| anyhow::anyhow!("selected CDP target has no websocket URL"))?;
     runtime.set_websocket_url(websocket_url);
     let settings = codex_plus_core::settings::SettingsStore::default()
-        .load()
+        .load_for_enhancements()
         .unwrap_or_default();
     let script = codex_plus_core::assets::injection_script_with_settings(helper_port, &settings);
-    let new_document_scripts = vec![
-        script,
-        codex_plus_core::user_scripts::BOOTSTRAP_SCRIPT.to_string(),
-    ];
+    let new_document_scripts = vec![script];
     codex_plus_core::bridge::install_bridge(
         websocket_url,
         codex_plus_core::bridge::BRIDGE_BINDING_NAME,

@@ -51,19 +51,6 @@ pub fn run() {
             }
         }
     }
-    if let Ok(settings) = codex_plus_core::settings::SettingsStore::default().load()
-        && let Err(error) = codex_plus_core::dream_skin::sync_default_dream_skin_base_theme(
-            settings.enhancements_enabled
-                && settings.codex_app_dream_skin_enabled
-                && !settings.codex_app_dream_skin_paused,
-            &settings.codex_app_dream_skin_theme_config,
-        )
-    {
-        let _ = codex_plus_core::diagnostic_log::append_diagnostic_log(
-            "manager.dream_skin_base_theme_sync_failed",
-            serde_json::json!({ "message": error.to_string() }),
-        );
-    }
     let show_update = commands::startup_should_show_update();
     let app_result = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -95,7 +82,6 @@ pub fn run() {
                 Ok(())
             });
             start_window_activation_listener(app.handle().clone());
-            commands::start_weixin_connect_from_saved_settings();
             register_main_window_events(main_window);
             commands::resume_existing_codex_background(app.handle().clone());
             // 自动接管官方 App（默认关闭）：设置里开着才起守护线程。
@@ -108,136 +94,22 @@ pub fn run() {
             commands::consume_pending_manager_navigation,
             commands::load_overview,
             commands::launch_codex_plus,
-            commands::launch_codex_multi_instance,
-            commands::list_codex_multi_instances,
-            commands::stop_codex_multi_instance,
-            commands::restart_codex_multi_instance,
             commands::restart_codex_plus,
             commands::load_settings,
             commands::dictation_local_model_status,
             commands::download_dictation_local_model,
-            commands::claude_localization_status,
-            commands::claude_localization_action,
-            commands::claude_localization_set_voice_input,
-            commands::claude_localization_set_localization,
             commands::native_browser_status,
             commands::save_settings,
-            commands::list_tools,
-            commands::test_vlm,
-            commands::load_grok_config,
-            commands::save_grok_config,
-            commands::load_grok_providers,
-            commands::apply_grok_relay_profile,
-            commands::weixin_connect_qr_start,
-            commands::weixin_connect_qr_status,
-            commands::weixin_connect_status,
-            commands::weixin_connect_start,
-            commands::weixin_connect_stop,
-            commands::find_desktop_codex_cli,
-            commands::query_builtin_model_metadata,
-            commands::builtin_model_metadata_index,
-            commands::dream_skin_status,
-            commands::import_dream_skin_image,
-            commands::reset_dream_skin_image,
-            commands::reset_dream_skin_theme,
-            commands::apply_dream_skin,
-            commands::restore_dream_skin,
-            commands::verify_dream_skin,
-            commands::list_dream_skin_themes,
-            commands::refresh_dream_skin_market,
-            commands::refresh_dream_skin_community,
-            commands::load_pending_dream_skin_community,
-            commands::confirm_pending_dream_skin_community,
-            commands::dismiss_pending_dream_skin_community,
-            commands::install_dream_skin_market_theme,
-            commands::install_dream_skin_community_theme,
-            commands::import_dream_skin_theme_package,
-            commands::load_dream_skin_theme,
-            commands::create_dream_skin_theme,
-            commands::save_dream_skin_theme,
-            commands::rename_dream_skin_theme,
-            commands::delete_dream_skin_theme,
-            commands::activate_dream_skin_theme,
-            commands::load_ccs_providers,
-            commands::import_ccs_providers,
-            commands::load_pending_provider_import,
-            commands::confirm_pending_provider_import,
-            commands::dismiss_pending_provider_import,
-            commands::list_local_sessions,
-            commands::delete_local_session,
-            commands::load_provider_sync_targets,
-            commands::repair_session_index,
-            commands::load_session_index_repair_report,
-            commands::preview_session_index_cleanup,
-            commands::preview_provider_sync,
-            commands::apply_session_index_cleanup,
-            commands::sync_providers_now,
-            commands::load_ads,
-            commands::refresh_script_market,
-            commands::refresh_plugin_market,
-            commands::install_plugin_market_item,
-            commands::plugin_market_install_status,
-            commands::refresh_user_script_inventory,
-            commands::reload_user_scripts,
-            commands::install_market_script,
-            commands::set_user_scripts_enabled,
-            commands::set_user_script_enabled,
-            commands::delete_user_script,
-            commands::refresh_skill_catalog,
-            commands::list_installed_skills,
-            commands::install_skill,
-            commands::update_skill,
-            commands::set_skill_enabled,
-            commands::uninstall_skill,
-            commands::restore_skill_backup,
-            commands::delete_skill_backup,
-            commands::upsert_skill_repo,
-            commands::delete_skill_repo,
             commands::open_external_url,
-            commands::repair_shortcuts,
-            commands::check_update,
-            commands::perform_update,
-            commands::load_watcher_state,
-            commands::set_watcher_enabled,
             // 自动接管官方 App：前端 invoke 找不到命令时是运行期静默失败，
             // 没有编译期兜底，所以这三个必须注册在这里（契约测试会守）。
             commands::load_auto_takeover_state,
             commands::take_over_codex_now,
             commands::pause_auto_takeover_for_instance,
             commands::read_latest_logs,
-            commands::clear_logs,
-            commands::scan_agent_cache,
-            commands::clean_agent_cache,
             commands::copy_diagnostics,
-            commands::reset_settings,
-            commands::reset_image_overlay_settings,
-            commands::relay_status,
-            commands::read_relay_files,
-            commands::check_env_conflicts,
-            commands::check_relay_environment,
-            commands::remove_env_conflicts,
-            commands::save_relay_file,
             commands::write_diagnostic_event,
-            commands::backfill_relay_profile_from_live,
-            commands::list_context_entries,
-            commands::read_live_context_entries,
-            commands::sync_live_context_entries,
-            commands::upsert_context_entry,
-            commands::delete_context_entry,
-            commands::parse_mcp_entry,
-            commands::build_mcp_entry,
-            commands::preview_mcp_servers_json,
-            commands::import_mcp_servers_json,
-            commands::extract_relay_common_config,
-            commands::test_relay_profile,
-            commands::diagnose_relay_profile,
             commands::test_stepwise_settings,
-            commands::fetch_relay_profile_models,
-            commands::fetch_sub2api_billing,
-            commands::switch_relay_profile,
-            commands::apply_relay_injection,
-            commands::apply_pure_api_injection,
-            commands::clear_relay_injection,
             manager_exit_app,
             manager_hide_to_tray,
             update_tray_labels
@@ -267,13 +139,6 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             match event {
-                tauri::RunEvent::Opened { urls } => {
-                    for url in urls {
-                        if handle_dream_skin_url(url.as_str()) {
-                            show_main_window(app_handle);
-                        }
-                    }
-                }
                 tauri::RunEvent::Reopen { .. } => {
                     show_main_window(app_handle);
                 }
@@ -294,27 +159,6 @@ pub fn run() {
     }
 }
 
-pub fn handle_dream_skin_url(url: &str) -> bool {
-    if !url.starts_with("dreamskin://") {
-        return false;
-    }
-    match codex_plus_core::dream_skin_community::save_pending_community_link(url) {
-        Ok(version_id) => {
-            let _ = codex_plus_core::diagnostic_log::append_diagnostic_log(
-                "manager.dream_skin_link.pending",
-                serde_json::json!({ "versionId": version_id }),
-            );
-            true
-        }
-        Err(error) => {
-            let _ = codex_plus_core::diagnostic_log::append_diagnostic_log(
-                "manager.dream_skin_link.failed",
-                serde_json::json!({ "error": error.to_string() }),
-            );
-            false
-        }
-    }
-}
 
 fn install_tray<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, TRAY_MENU_SHOW, "显示主窗口", true, None::<&str>)?;

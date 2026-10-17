@@ -1574,6 +1574,11 @@ impl Drop for SettingsNormalizeGuard {
 }
 
 impl SettingsStore {
+    /// 增强版加载时屏蔽其他业务，原始配置保留在磁盘中。
+    pub fn load_for_enhancements(&self) -> anyhow::Result<BackendSettings> {
+        self.load().map(crate::enhancements_only::runtime_settings)
+    }
+
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }

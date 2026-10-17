@@ -10425,3 +10425,12 @@ select {
 .aggregate-default-login-note {
   display: block;
 }
+/* 增强专用管理器只有一层导航。 */
+.shell.enhancements-only-shell { grid-template-columns: 220px minmax(0, 1fr); }
+.enhancements-only-shell .sidebar { grid-column: 1; }
+.enhancements-only-shell .workspace { grid-column: 2; }
+.enhancements-only-shell .sidebar > .toolbar { margin-top: auto; padding: 16px; }
+.enhancements-only-shell .settings-page { display: grid; gap: 20px; max-width: 960px; }
+.enhancements-only-shell .settings-page > label { display: grid; gap: 8px; }
+.enhancement-notice { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; }
+.enhancement-notice.is-error { color: var(--destructive, #e76b6b); }

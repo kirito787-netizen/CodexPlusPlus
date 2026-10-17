@@ -70,7 +70,7 @@ test("patch diagnostics describe only patch state, not browser availability", ()
 });
 
 test("consent precedes enabling, default is off, and refresh is read-only", async () => {
-  const app = await readFile(new URL("./App.tsx", import.meta.url), "utf8");
+  const app = await readFile(new URL("./EnhancementUI.tsx", import.meta.url), "utf8");
   const component = await readFile(new URL("./native-browser-settings.tsx", import.meta.url), "utf8");
   assert.match(app, /codexAppNativeBrowserRequireIdentification: false/);
   assert.match(app, /if \(value && !window\.confirm\(nativeBrowserConsent\)\) return;/);
